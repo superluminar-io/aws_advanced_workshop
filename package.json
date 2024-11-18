@@ -1,0 +1,20 @@
+{
+  "name": "aws_advanced_workshop",
+  "version": "1.0.0",
+  "description": "Hands-on AWS advanced workshop for beginners",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "start": "docsify serve ./docs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/superluminar-io/aws_advanced_workshop.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "docsify-cli": "^4.4.4"
+  }
+}

@@ -1,0 +1,24 @@
+- [Welcome](/0_welcome)
+- Labs
+  - Lab 0
+    - [Pulumi Setup](/labs/lab_0/0_setup)
+    - [Resources](/labs/lab_0/1_resources)
+  - Lab 1
+    - [Intro to ECS](/labs/lab_1/0_ecs_intro)
+    - [Hands On](/labs/lab_1/1_hands_on)
+    - [Resources](/labs/lab_1/2_resources)
+  - Lab 2
+    - [Intro to ALB](/labs/lab_2/0_alb_intro)
+    - [Hands On](/labs/lab_2/1_hands_on)
+    - [Resources](/labs/lab_2/2_resources)
+  - Lab 3
+    - [Intro to ECR](/labs/lab_3/0_ecr_intro)
+    - [Hands On](/labs/lab_3/1_hands_on)
+    - [Resources](/labs/lab_3/2_resources)
+  - Lab 4
+    - [Intro to CloudFront](/labs/lab_4/0_cloudfront_intro)
+    - [Hands On](/labs/lab_4/1_hands_on)
+    - [Resources](/labs/lab_4/2_resources)
+  - [Clean Up](/labs/lab_cleanup)
+- [Next Steps](/2_next)
+- [Conclusion](/3_conclusion)
