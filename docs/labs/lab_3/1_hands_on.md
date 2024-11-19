@@ -2,7 +2,7 @@
 
 ## Step 1: Create ECR Repository
 
-Add to your existing `index.ts`:
+Add this code to the beginning of your `index.ts`:
 ```typescript
 // Create ECR Repository
 const repository = new aws.ecr.Repository("workshop-app", {
@@ -17,78 +17,92 @@ const repository = new aws.ecr.Repository("workshop-app", {
 export const repositoryUrl = repository.repositoryUrl;
 ```
 
+And deploy the changes:
+
+```bash
+pulumi up
+```
+
 ## Step 2: Build and Push the Image
 
-1. **Create Application Files**:
-   Add a `Application.kt` file to the root of your project:
-```kotlin
-package com.workshop.app
+Create and prepare an application directory:
 
-import org.springframework.boot.autoconfigure.SpringBootApplication
-import org.springframework.boot.runApplication
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.RestController
+```bash
+mkdir application
+cd application
+npm init -y
+npm install express @types/express typescript ts-node
+```
 
-@SpringBootApplication
-class Application
-
-fun main(args: Array<String>) {
-    runApplication<Application>(*args)
-}
-
-@RestController
-class HelloController {
-    @GetMapping("/")
-    fun hello() = mapOf("message" to "Hello from ECS!")
+Create a `tsconfig.json` file:
+```json
+{
+  "compilerOptions": {
+    "target": "es6",
+    "module": "commonjs",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  }
 }
 ```
 
-Add a `build.gradle.kts` file to the root of your project:
-```kotlin
-plugins {
-    id("org.springframework.boot") version "3.2.3"
-    id("io.spring.dependency-management") version "1.1.4"
-    kotlin("jvm") version "1.9.22"
-    kotlin("plugin.spring") version "1.9.22"
-}
+Create `src/app.ts`:
+```typescript
+import express from 'express';
 
-group = "com.workshop"
-version = "0.0.1-SNAPSHOT"
+const app = express();
+const port = 8080;
 
-repositories {
-    mavenCentral()
-}
+app.get('/', (req, res) => {
+  res.json({ message: 'Hello from ECS!' });
+});
 
-dependencies {
-    implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
-    implementation("org.jetbrains.kotlin:kotlin-reflect")
-}
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
 ```
 
 Create a `Dockerfile`:
 ```dockerfile
-FROM gradle:8.6.0-jdk17 AS build
-WORKDIR /app
-COPY build.gradle.kts settings.gradle.kts ./
-COPY src ./src
-RUN gradle build --no-daemon
+FROM --platform=linux/amd64 node:18-alpine
 
-FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
-COPY --from=build /app/build/libs/*.jar app.jar
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+RUN npm run build
+
+EXPOSE 80
+CMD ["node", "dist/app.js"]
+```
+
+Update `package.json` scripts:
+```json
+{
+...
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/app.js"
+  }
+...
+}
 ```
 
 2. **Build and Push Commands**:
-Get ECR login credentials
+Get ECR login credentials (make sure you exported the `PULUMI_CONFIG_PASSPHRASE` environment variable):
+
 ```bash
 aws ecr get-login-password --region eu-central-1 | docker login --username AWS --password-stdin $(pulumi stack output repositoryUrl)
 ```
 
 Build the image
 ```bash
+cd application/
 docker build -t workshop-app .
 ```
 
@@ -108,29 +122,29 @@ Update your task definition in `index.ts` to use the custom image:
 ```typescript
 // Update Task Definition with custom image
 const taskDefinition = new aws.ecs.TaskDefinition("workshop-task", {
-family: "workshop-app",
-cpu: "256",
-memory: "512",
-networkMode: "awsvpc",
-requiresCompatibilities: ["FARGATE"],
-executionRoleArn: taskExecutionRole.arn,
-containerDefinitions: pulumi.all([repository.repositoryUrl])
-.apply(([repoUrl]) => JSON.stringify([{
-name: "workshop-app",
-image: ${repoUrl}:latest,
-portMappings: [{
-containerPort: 8080,
-protocol: "tcp",
-}],
-logConfiguration: {
-logDriver: "awslogs",
-options: {
-"awslogs-group": "/ecs/workshop-app",
-"awslogs-region": "eu-central-1",
-"awslogs-stream-prefix": "ecs",
-},
-},
-}])),
+    family: "workshop-app",
+    cpu: "256",
+    memory: "512",
+    networkMode: "awsvpc",
+    requiresCompatibilities: ["FARGATE"],
+    executionRoleArn: taskExecutionRole.arn,
+    containerDefinitions: pulumi.all([repository.repositoryUrl])
+    .apply(([repoUrl]) => JSON.stringify([{
+        name: containerName,
+        image: `${repoUrl}:latest`,
+        portMappings: [{
+            containerPort: 80,
+            protocol: "tcp",
+        }],
+        logConfiguration: {
+            logDriver: "awslogs",
+            options: {
+                "awslogs-group": "/ecs/workshop-app",
+                "awslogs-region": "eu-central-1",
+                "awslogs-stream-prefix": "ecs",
+            },
+        },
+    }])),
 });
 ```
 
@@ -138,12 +152,12 @@ options: {
 
 1. **Deploy the Changes**:
 ```bash
+cd ../ # go back to the root of the project
 pulumi up
 ```
 
 2. **Verify the Deployment**:
-   - Navigate to ECR in AWS Console
-   - Check image scan results
+   - Navigate to ECR in AWS Console and check that the image was pushed successfully
    - View running tasks in ECS
    - Access the application through ALB DNS (from Lab 2)
 

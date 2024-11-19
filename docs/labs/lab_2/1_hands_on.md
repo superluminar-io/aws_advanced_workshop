@@ -2,7 +2,7 @@
 
 ## Step 1: Create ALB Security Group
 
-Add the following code to your existing `index.ts`:
+Add the following code to your existing `index.ts` before the `taskSg`:
 ```typescript
 // Create Security Group for ALB
 const albSg = new aws.ec2.SecurityGroup("alb-sg", {
@@ -21,26 +21,10 @@ const albSg = new aws.ec2.SecurityGroup("alb-sg", {
         cidrBlocks: ["0.0.0.0/0"],
     }],
 });
-// Update ECS Task Security Group to allow traffic from ALB
-const taskSg = new aws.ec2.SecurityGroup("task-sg", {
-    vpcId: vpc.id,
-    description: "Security group for ECS tasks",
-    ingress: [{
-        protocol: "tcp",
-        fromPort: 80,
-        toPort: 80,
-        securityGroups: [albSg.id],
-    }],
-    egress: [{
-        protocol: "-1",
-        fromPort: 0,
-    toPort: 0,
-    cidrBlocks: ["0.0.0.0/0"],
-    }],
-});
 ```
 
 ## Step 2: Create ALB and Target Group
+Add this code before the ECS Service:
 ```typescript
 // Create Target Group
 const targetGroup = new aws.lb.TargetGroup("workshop-tg", {
@@ -63,7 +47,7 @@ const alb = new aws.lb.LoadBalancer("workshop-alb", {
     subnets: [publicSubnet1.id, publicSubnet2.id],
 });
 // Create ALB Listener
-const listener = new aws.lb.Listener("workshop-listener", {
+new aws.lb.Listener("workshop-listener", {
     loadBalancerArn: alb.arn,
     port: 80,
     protocol: "HTTP",
@@ -74,11 +58,29 @@ const listener = new aws.lb.Listener("workshop-listener", {
 });
 ```
 
-## Step 3: Update ECS Service
+## Step 3: Update ECS Service and its Security Group
 ```typescript
-typescript
+// Update ECS Task Security Group to allow traffic from ALB
+const taskSg = new aws.ec2.SecurityGroup("task-sg", {
+    vpcId: vpc.id,
+    description: "Security group for ECS tasks",
+    ingress: [{
+        protocol: "tcp",
+        fromPort: 80,
+        toPort: 80,
+        securityGroups: [albSg.id],
+    }],
+    egress: [{
+        protocol: "-1",
+        fromPort: 0,
+    toPort: 0,
+    cidrBlocks: ["0.0.0.0/0"],
+    }],
+});
+```
+```typescript
 // Update ECS Service with Load Balancer
-const service = new aws.ecs.Service("workshop-service", {
+new aws.ecs.Service("workshop-service", {
     cluster: cluster.id,
     taskDefinition: taskDefinition.arn,
     desiredCount: 2,
@@ -90,7 +92,7 @@ const service = new aws.ecs.Service("workshop-service", {
     },
     loadBalancers: [{
         targetGroupArn: targetGroup.arn,
-        containerName: "workshop-app",
+        containerName: containerName,
         containerPort: 80,
     }],
 });
@@ -105,56 +107,6 @@ export const albDnsName = alb.dnsName;
 pulumi up
 ```
 
-2. **Check ALB Status**:
-   - Navigate to EC2 > Load Balancers in AWS Console
-   - Verify the ALB is in "active" state
-   - Check that target group has healthy targets
+Navigate to the EC2 service in the AWS Console and select Load Balancers from the left navigation menu. Verify that your Application Load Balancer shows an "active" state in the console. Then, check your target group to ensure it has healthy targets registered.
 
-3. **Test the Application**:
-   - Copy the ALB DNS name from Pulumi outputs
-   - Open in a web browser
-   - You should see the nginx welcome page
-
-## Best Practices
-
-1. **Security**:
-   - Follow security group best practices from Lab 3 (reference lines 450-454)
-   - Use HTTPS listeners in production
-   - Implement WAF for additional security
-
-2. **High Availability**:
-   - Deploy across multiple AZs
-   - Monitor health check thresholds
-   - Configure appropriate scaling policies
-
-3. **Monitoring**:
-   - Enable access logs
-   - Set up CloudWatch alarms for:
-     - Unhealthy host count
-     - Request count
-     - Target response time
-   - Monitor 5xx errors
-
-## Troubleshooting
-
-Common issues and solutions:
-
-1. **Unhealthy Targets**:
-   - Check security group rules
-   - Verify health check path
-   - Inspect target group settings
-   - Review ECS task logs
-
-2. **Connection Timeouts**:
-   - Verify VPC routing
-   - Check security group rules
-   - Ensure NAT Gateway is working
-
-3. **5xx Errors**:
-   - Check application logs
-   - Verify container health
-   - Monitor resource utilization
-
-## Next Steps
-
-In Lab 3, we'll learn about Amazon ECR and how to build and push custom container images.
+To test your application, copy the ALB DNS name from your Pulumi outputs. Open this DNS name in a web browser, and you should see the default nginx welcome page displayed, confirming that your load balancer is properly routing traffic to your containers.

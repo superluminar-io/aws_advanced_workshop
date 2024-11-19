@@ -22,9 +22,3 @@ We'll extend our Lab 1 architecture by adding:
 4. Updated ECS service with load balancer integration
 
 ![ALB Integration Architecture](../../media/lab_2_arch.drawio.svg)
-
-## Prerequisites
-
-- Completed Lab 1
-- Understanding of basic networking concepts
-- Familiarity with HTTP/HTTPS protocols

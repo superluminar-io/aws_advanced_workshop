@@ -24,6 +24,22 @@ EC2, on the other hand, provides more control over your infrastructure. It's sim
 
 The ECS architecture consists of several key components working together. **Task Definitions** serve as blueprints for your applications, specifying everything from memory allocations to environment variables. **Services** ensure your tasks maintain high availability, automatically replacing failed containers and integrating with load balancers for traffic distribution.
 
+### Container Images: Using Public ECR
+
+While Docker Hub is commonly used for public images, it has rate limits for anonymous users which can cause deployment failures. Instead, use AWS Public ECR which doesn't have these limitations. For example, instead of:
+```typescript
+image: "nginx:latest" // Docker Hub image
+```
+
+Use the AWS Public ECR equivalent:
+```typescript
+image: "public.ecr.aws/nginx/nginx:latest" // AWS Public ECR image
+```
+
+This ensures reliable deployments even without authentication. AWS Public ECR also provides better availability and faster pull times within AWS infrastructure.
+
+For a list of official images on AWS Public ECR, visit the [AWS Public ECR Gallery](https://gallery.ecr.aws/).
+
 ## Architecture
 
 In this lab, we'll build:
@@ -40,8 +56,3 @@ In this lab, we'll build:
 Make sure you've completed Lab 0 and have:
 - Pulumi project initialized
 - AWS credentials configured
-
-## Expected Duration
-
-- Setup: 5-10 minutes
-- Lab: 30-45 minutes

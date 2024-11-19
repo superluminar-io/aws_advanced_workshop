@@ -41,4 +41,9 @@ This lab will guide you through setting up your development environment with Pul
    - Stack name: dev
    - AWS region: eu-central-1
 
+5. **Export the Pulumi passphrase**:
+   ```bash
+   export PULUMI_CONFIG_PASSPHRASE="<passphrase>" # could be empty
+   ```
+
 Your environment is now ready for the workshop labs!

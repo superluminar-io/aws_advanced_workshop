@@ -5,8 +5,8 @@
 First, let's set up our networking infrastructure. Add the following to your `index.ts`:
 
 ```typescript
-import as pulumi from "@pulumi/pulumi";
-import as aws from "@pulumi/aws";
+import * as pulumi from "@pulumi/pulumi";
+import * as aws from "@pulumi/aws";
 // Create VPC
 const vpc = new aws.ec2.Vpc("workshop-vpc", {
     cidrBlock: "10.0.0.0/16",
@@ -30,6 +30,12 @@ const publicSubnet2 = new aws.ec2.Subnet("workshop-public-2", {
     availabilityZone: "eu-central-1b",
     mapPublicIpOnLaunch: true,
 });
+// Create NAT Gateway (in public subnet)
+const eip = new aws.ec2.Eip("nat-eip", {});
+const natGateway = new aws.ec2.NatGateway("nat-gateway", {
+    allocationId: eip.id,
+    subnetId: publicSubnet1.id,
+});
 // Create Private Subnets
 const privateSubnet1 = new aws.ec2.Subnet("workshop-private-1", {
     vpcId: vpc.id,
@@ -50,13 +56,29 @@ const publicRouteTable = new aws.ec2.RouteTable("workshop-public-rt", {
         }],
 });
 // Associate Public Subnets with Public Route Table
-const publicRtAssoc1 = new aws.ec2.RouteTableAssociation("workshop-public-rt-assoc-1", {
+new aws.ec2.RouteTableAssociation("workshop-public-rt-assoc-1", {
     subnetId: publicSubnet1.id,
     routeTableId: publicRouteTable.id,
 });
-const publicRtAssoc2 = new aws.ec2.RouteTableAssociation("workshop-public-rt-assoc-2", {
+new aws.ec2.RouteTableAssociation("workshop-public-rt-assoc-2", {
     subnetId: publicSubnet2.id,
     routeTableId: publicRouteTable.id,
+});
+const privateRouteTable = new aws.ec2.RouteTable("workshop-private-rt", {
+    vpcId: vpc.id,
+    routes: [{
+        cidrBlock: "0.0.0.0/0",
+            gatewayId: natGateway.id,
+        }],
+});
+// Associate Private Subnets with Private Route Table
+new aws.ec2.RouteTableAssociation("workshop-private-rt-assoc-1", {
+    subnetId: privateSubnet1.id,
+    routeTableId: privateRouteTable.id,
+});
+new aws.ec2.RouteTableAssociation("workshop-private-rt-assoc-2", {
+    subnetId: privateSubnet2.id,
+    routeTableId: privateRouteTable.id,
 });
 ```
 
@@ -67,10 +89,6 @@ Add the ECS cluster configuration:
 // Create ECS Cluster
 const cluster = new aws.ecs.Cluster("workshop-cluster", {
     name: "workshop-cluster",
-    settings: [{
-        name: "containerInsights",
-        value: "enabled",
-    }],
 });
 // Create Task Execution Role
 const taskExecutionRole = new aws.iam.Role("ecs-task-execution-role", {
@@ -85,7 +103,7 @@ const taskExecutionRole = new aws.iam.Role("ecs-task-execution-role", {
         }],
     }),
 });
-const taskExecutionRolePolicy = new aws.iam.RolePolicyAttachment(
+new aws.iam.RolePolicyAttachment(
     "ecs-task-execution-role-policy",
     {
         role: taskExecutionRole.name,
@@ -98,7 +116,14 @@ const taskExecutionRolePolicy = new aws.iam.RolePolicyAttachment(
 
 Add the following code to create the task definition and ECS service:
 ```typescript
+// Create CloudWatch Log Group
+const logGroup = new aws.cloudwatch.LogGroup("workshop-log-group", {
+    name: "/ecs/workshop-app",
+    retentionInDays: 7,
+});
+
 // Create Task Definition
+const containerName = "workshop-app";
 const taskDefinition = new aws.ecs.TaskDefinition("workshop-task", {
     family: "workshop-app",
     cpu: "256",
@@ -107,8 +132,8 @@ const taskDefinition = new aws.ecs.TaskDefinition("workshop-task", {
     requiresCompatibilities: ["FARGATE"],
     executionRoleArn: taskExecutionRole.arn,
     containerDefinitions: JSON.stringify([{
-        name: "workshop-app",
-        image: "nginx:latest",
+        name: containerName,
+        image: "public.ecr.aws/nginx/nginx:latest",
         portMappings: [{
             containerPort: 80,
             protocol: "tcp",
@@ -116,7 +141,7 @@ const taskDefinition = new aws.ecs.TaskDefinition("workshop-task", {
         logConfiguration: {
             logDriver: "awslogs",
             options: {
-                "awslogs-group": "/ecs/workshop-app",
+                "awslogs-group": logGroup.name,
                 "awslogs-region": "eu-central-1",
                 "awslogs-stream-prefix": "ecs",
             },
@@ -164,43 +189,5 @@ pulumi up
 ```
 
 2. **Verify in AWS Console**:
-   - Navigate to ECS service
-   - Check cluster status
-   - Verify running tasks
-   - Monitor CloudWatch logs
+Navigate to the ECS service in the AWS Console. Check that your ECS service status is "ACTIVE" and verify that you have the expected number of tasks running in your service. You can find detailed task information, including their current status and any recent events, in the Tasks tab of your ECS service.
 
-## Best Practices
-
-1. **Security**:
-   - Follow least privilege principle for IAM roles
-   - Use private subnets for tasks
-   - Restrict security group rules
-
-2. **Logging**:
-   - Enable CloudWatch logs
-   - Set appropriate retention periods
-   - Use structured logging
-
-3. **Networking**:
-   - Use private subnets for containers
-   - Implement proper security groups
-   - Consider NAT Gateway costs
-
-## Troubleshooting
-
-Common issues and solutions:
-
-1. **Task Failed to Start**:
-   - Check CloudWatch logs
-   - Verify security group rules
-   - Ensure proper subnet configuration
-
-2. **Network Connectivity**:
-   - Verify VPC endpoints
-   - Check NAT Gateway configuration
-   - Validate security group rules
-
-3. **Service Stability**:
-   - Monitor service events
-   - Check task definition compatibility
-   - Verify resource allocation
