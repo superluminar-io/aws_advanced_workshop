@@ -1,207 +1,192 @@
-# Lab 5: Implementing Message Queuing
+# Lab 5: Setting up CloudFront
 
-## Step 1: Modify the Kotlin application to send messages
-`MessageController.kt`
-```kotlin
-package com.workshop.app
-
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RestController
-import software.amazon.awssdk.services.sqs.SqsClient
-import software.amazon.awssdk.services.sqs.model.SendMessageRequest
-
-@RestController
-class MessageController(private val sqsClient: SqsClient) {
-    @PostMapping("/message")
-    fun sendMessage(@RequestBody message: Message) {
-        val request = SendMessageRequest.builder()
-            .queueUrl(System.getenv("QUEUE_URL"))
-            .messageBody(message.content)
-            .build()
-        sqsClient.sendMessage(request)
-    }
-}
-
-data class Message(val content: String)
-```
-
-`build.gradle.kts`
-```kotlin
-// Add to existing dependencies
-dependencies {
-    implementation(platform("software.amazon.awssdk:bom:2.24.0"))
-    implementation("software.amazon.awssdk:sqs")
-}
-```
-
-## Step 2: Create the infrastructure
-
-**Step 1: Create SQS Queue and Lambda Function**
+## Step 1: Create CloudFront Distribution
 
 Add to your existing `index.ts`:
 ```typescript
-// Create SQS Queue
-const queue = new aws.sqs.Queue("workshop-queue", {
-    visibilityTimeoutSeconds: 30,
-    messageRetentionSeconds: 86400,
-    redrivePolicy: JSON.stringify({
-        deadLetterTargetArn: new aws.sqs.Queue("workshop-dlq").arn,
-        maxReceiveCount: 3
-    })
-});
-// Create Lambda Role
-const lambdaRole = new aws.iam.Role("message-processor-role", {
-    assumeRolePolicy: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: [{
-            Action: "sts:AssumeRole",
-            Effect: "Allow",
-            Principal: {
-                Service: "lambda.amazonaws.com"
-            }
-        }]
-    })
-});
-// Add SQS permissions to Lambda Role
-new aws.iam.RolePolicy("lambda-sqs-policy", {
-    role: lambdaRole.id,
-    policy: queue.arn.apply(arn => JSON.stringify({
-        Version: "2012-10-17",
-        Statement: [{
-            Effect: "Allow",
-            Action: [
-                "sqs:ReceiveMessage",
-                "sqs:DeleteMessage",
-                "sqs:GetQueueAttributes"
-            ],
-            Resource: arn
-        }]
-    }))
-});
-// Create Lambda Function
-const processor = new aws.lambda.Function("message-processor", {
-    runtime: "nodejs18.x",
-    handler: "index.handler",
-    role: lambdaRole.arn,
-    code: new pulumi.asset.AssetArchive({
-        "index.js": new pulumi.asset.StringAsset( exports.handler = async (event) => { for (const record of event.Records) { console.log('Processing message:', record.body); } return { statusCode: 200 }; }; )
-    })
-});
-// Add SQS trigger to Lambda
-new aws.lambda.EventSourceMapping("queue-trigger", {
-    eventSourceArn: queue.arn,
-    functionName: processor.name,
-    batchSize: 1
-});
-// Update ECS Task Role with SQS permissions
-const taskRole = new aws.iam.Role("ecs-task-role", {
-    assumeRolePolicy: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: [{
-            Action: "sts:AssumeRole",
-            Effect: "Allow",
-            Principal: {
-                Service: "ecs-tasks.amazonaws.com"
-            }
-        }]
-    })
-});
-new aws.iam.RolePolicy("task-sqs-policy", {
-    role: taskRole.id,
-    policy: queue.arn.apply(arn => JSON.stringify({
-        Version: "2012-10-17",
-        Statement: [{
-            Effect: "Allow",
-            Action: ["sqs:SendMessage"],
-            Resource: arn
-        }]
-    }))
-});
-```
-
-## Step 3: Update ECS Task Definition
-
-Update your task definition to include the queue URL and permissions:
-```typescript
-// Update Task Definition with environment variables
-const taskDefinition = new aws.ecs.TaskDefinition("workshop-task", {
-    family: "workshop-app",
-    cpu: "256",
-    memory: "512",
-    networkMode: "awsvpc",
-    requiresCompatibilities: ["FARGATE"],
-    executionRoleArn: taskExecutionRole.arn,
-    taskRoleArn: taskRole.arn,
-    containerDefinitions: pulumi.all([repository.repositoryUrl, queue.url]).apply(([repoUrl, queueUrl]) => JSON.stringify([{
-        name: "workshop-app",
-        image: ${repoUrl}:latest,
-        environment: [{
-            name: "QUEUE_URL",
-            value: queueUrl
-        }],
-        portMappings: [{
-            containerPort: 8080,
-            protocol: "tcp",
-        }],
-        logConfiguration: {
-            logDriver: "awslogs",
-            options: {
-                "awslogs-group": "/ecs/workshop-app",
-                "awslogs-region": "eu-central-1",
-                "awslogs-stream-prefix": "ecs",
+// Create CloudFront distribution
+const distribution = new aws.cloudfront.Distribution("workshop-cdn", {
+    enabled: true,
+    defaultCacheBehavior: {
+        allowedMethods: [
+            "DELETE",
+            "GET",
+            "HEAD",
+            "OPTIONS",
+            "PATCH",
+            "POST",
+            "PUT",
+        ],
+        cachedMethods: [
+            "GET",
+            "HEAD",
+        ],
+        targetOriginId: "ALB",
+        viewerProtocolPolicy: "redirect-to-https",
+        forwardedValues: {
+            queryString: true,
+            cookies: {
+                forward: "all",
             },
         },
-    }])),
+        minTtl: 0,
+        defaultTtl: 3600,
+        maxTtl: 86400,
+    },
+    origins: [{
+        domainName: alb.dnsName,
+        originId: "ALB",
+        customOriginConfig: {
+            httpPort: 80,
+            httpsPort: 443,
+            originProtocolPolicy: "http-only",
+            originSslProtocols: ["TLSv1.2"],
+        },
+    }],
+    restrictions: {
+        geoRestriction: {
+            restrictionType: "none",
+        },
+    },
+    viewerCertificate: {
+        cloudfrontDefaultCertificate: true,
+    },
 });
+    // Export CloudFront domain
+export const cloudfrontDomain = distribution.domainName;
 ```
 
-
 ## Verify the Deployment
-
-Following the checkpoint style from Lab 2 (lines 276-292):
 
 1. **Deploy the Changes**:
 ```bash
 pulumi up
 ```
 
-2. **Test Message Processing**:
+2. **Verify in AWS Console**:
+   - Navigate to CloudFront
+   - Check distribution status
+   - Test the application through CloudFront URL with HTTPS
 
-Send a test message
+## Step 2: Add a custom error page served from an S3 bucket
 
-```bash
-curl -X POST -H "Content-Type: application/json" \
--d '{"content":"Hello from ECS!"}' \
-http://$(pulumi stack output loadBalancerDns)/message
+Add an S3 bucket and a custom error page served from it before the CloudFront distribution:
+
+```typescript
+// Create S3 bucket for error pages
+const errorPagesBucket = new aws.s3.BucketV2("error-pages", {
+    forceDestroy: true,
+});
+
+// Block all public access
+new aws.s3.BucketPublicAccessBlock("error-pages-public-access", {
+    bucket: errorPagesBucket.id,
+    blockPublicAcls: true,
+    blockPublicPolicy: true,
+    ignorePublicAcls: true,
+    restrictPublicBuckets: true,
+});
+
+// Upload error page to S3
+new aws.s3.BucketObject("404-page", {
+    bucket: errorPagesBucket.id,
+    key: "404.html",
+    content: `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Page Not Found</title>
+</head>
+<body>
+    <h1>404 - Page Not Found</h1>
+    <p>This error page is served from an S3 bucket.</p>
+</body>
+</html>
+    `,
+    contentType: "text/html",
+});
 ```
-Check Lambda logs in CloudWatch
 
-## Best Practices
+Update the CloudFront distribution to use the error page by adding an Origin Access Control:
 
-1. **Queue Management**:
-   - Configure DLQ for failed messages
-   - Set appropriate retention periods
-   - Monitor queue metrics
-   - Implement proper error handling
+```typescript
+// Create Origin Access Control for S3
+const oac = new aws.cloudfront.OriginAccessControl("error-pages-oac", {
+    description: "OAC for error pages",
+    originAccessControlOriginType: "s3",
+    signingBehavior: "always",
+    signingProtocol: "sigv4",
+});
+```
 
-2. **Lambda Best Practices**:
-   - Handle partial batch failures
-   - Implement proper error handling
-   - Monitor function performance
-   - Set appropriate timeout values
+Update the CloudFront distribution configuration:
 
-3. **Security**:
-   - Follow least privilege principle
-   - Encrypt messages in transit
-   - Implement proper access controls
-   - Regular security audits
+```typescript
+// Update CloudFront distribution configuration
+const distribution = new aws.cloudfront.Distribution("workshop-cdn", {
+    enabled: true,
+    // ... existing configuration ...
+    origins: [{
+        domainName: alb.dnsName,
+        originId: "ALB",
+        customOriginConfig: {
+            httpPort: 80,
+            httpsPort: 443,
+            originProtocolPolicy: "http-only",
+            originSslProtocols: ["TLSv1.2"],
+        },
+    }, {
+        domainName: errorPagesBucket.bucketRegionalDomainName,
+        originId: "ErrorPages",
+        originAccessControlId: oac.id,
+    }],
+    orderedCacheBehaviors: [{
+        pathPattern: "/404.html",
+        targetOriginId: "ErrorPages",
+        allowedMethods: ["GET", "HEAD"],
+        cachedMethods: ["GET", "HEAD"],
+        viewerProtocolPolicy: "redirect-to-https",
+        forwardedValues: {
+            queryString: false,
+            headers: [],
+            cookies: {
+                forward: "none",
+            },
+        },
+    }],
+    customErrorResponses: [{
+        errorCode: 404,
+        responseCode: 404,
+        responsePagePath: "/404.html",
+        errorCachingMinTtl: 300,
+    }],
+});
+```
 
-## Checkpoint
+Add a bucket policy to allow CloudFront to access the error page:
 
-At this point, you should have:
-- Created an SQS queue with DLQ
-- Updated the ECS task definition
-- Created a Lambda consumer
-- Successfully sent and processed messages
-- Verified message flow in CloudWatch
+```typescript
+// Add bucket policy for CloudFront access
+new aws.s3.BucketPolicy("error-pages-policy", {
+    bucket: errorPagesBucket.id,
+    policy: pulumi.all([errorPagesBucket.arn, distribution.arn])
+        .apply(([bucketArn, distributionArn]) => JSON.stringify({
+            Version: "2012-10-17",
+            Statement: [{
+                Effect: "Allow",
+                Principal: {
+                    Service: "cloudfront.amazonaws.com"
+                },
+                Action: "s3:GetObject",
+                Resource: `${bucketArn}/*`,
+                Condition: {
+                    StringEquals: {
+                        "AWS:SourceArn": distributionArn
+                    }
+                }
+            }]
+        }))
+});
+```
+
+According to the best practices, the error page should be served via cloudfront and not directly from the S3 bucket. The bucket itself is private and only accessible via the CloudFront distribution.

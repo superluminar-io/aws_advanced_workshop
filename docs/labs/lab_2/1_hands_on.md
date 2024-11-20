@@ -80,7 +80,7 @@ const taskSg = new aws.ec2.SecurityGroup("task-sg", {
 ```
 ```typescript
 // Update ECS Service with Load Balancer
-new aws.ecs.Service("workshop-service", {
+const service = new aws.ecs.Service("workshop-service", {
     cluster: cluster.id,
     taskDefinition: taskDefinition.arn,
     desiredCount: 2,

@@ -1,23 +1,23 @@
-# Lab 3: Custom Container Images with ECR
+# Lab 3: Container Registry Integration
 
 ## Overview
 
-In this lab, you'll learn how to:
-1. Create an Amazon ECR repository
-2. Build a custom Kotlin application
-3. Push the container image to ECR
-4. Update the ECS service to use your custom image
+In this lab, you'll learn how to integrate Amazon Elastic Container Registry (ECR) to store and manage your container images. We'll build upon the load-balanced ECS infrastructure created in Lab 2.
 
 ## Key Concepts
 
 ### Amazon ECR
-- Private container registry
-- Integrated with ECS
-- Secure image storage
-- Image scanning and lifecycle policies
+- **Private Registry**: Secure, scalable container image storage within your AWS account
+- **Image Management**: Version control and lifecycle policies for container images
+- **Security Features**: Image scanning, encryption, and IAM integration
+- **ECS Integration**: Seamless deployment of images to ECS services
+- **Image Policies**: Control image retention and cleanup
 
-### Container Images
-- Custom application builds
-- Image tagging and versioning
-- Multi-stage Docker builds
-- Best practices for container security
+## Architecture
+
+We'll extend our Lab 2 architecture by adding:
+1. Private ECR repository for custom images
+2. Your custom container image
+3. Updated ECS task definitions
+
+![ECR Architecture](../../media/lab_3_arch.drawio.svg)

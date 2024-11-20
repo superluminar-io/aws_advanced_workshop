@@ -44,13 +44,13 @@ Throughout this workshop, we'll build our architecture in stages:
 3. **Container Registry**: Building and pushing custom images to ECR
    ![ECR Integration Architecture](media/lab_3_arch.drawio.svg)
 
-4. **Content Delivery**: Adding CloudFront distribution
+4. **Autoscaling**: Adding autoscaling to the ECS cluster
    ![Complete Architecture](media/lab_4_arch.drawio.svg)
 
-5. **Message Queuing**: Adding SQS with a lambda consumer
+5. **Content Delivery**: Adding CloudFront distribution
    ![Complete Architecture](media/lab_5_arch.drawio.svg)
 
-6. **Autoscaling**: Adding autoscaling to the ECS cluster
+6. **Message Queuing**: Adding SQS with a lambda consumer
    ![Complete Architecture](media/lab_6_arch.drawio.svg)
 
 ### Labs Overview
@@ -83,7 +83,17 @@ Throughout this workshop, we'll build our architecture in stages:
   - Push images to ECR
   - Update ECS services
 
-#### 4. Content Delivery and Edge Computing
+#### 4. Auto Scaling and Monitoring
+- **Scaling patterns and strategies**
+- **CloudWatch metrics and alarms**
+- **Capacity planning**
+- **Hands-On: Implement auto scaling**
+  - Configure scaling policies
+  - Set up CloudWatch alarms
+  - Monitor application metrics
+  - Test scaling behavior
+
+#### 5. Content Delivery and Edge Computing
 - **CloudFront architecture and concepts**
 - **Cache behaviors and policies**
 - **Edge computing patterns**
@@ -93,7 +103,7 @@ Throughout this workshop, we'll build our architecture in stages:
   - Set up cache policies
   - Implement SSL/TLS
 
-#### 5. Message Processing
+#### 6. Message Processing
 - **Event-driven architecture patterns**
 - **Message queue concepts**
 - **Dead letter queues**
@@ -102,16 +112,6 @@ Throughout this workshop, we'll build our architecture in stages:
   - Configure message retention
   - Implement Lambda consumers
   - Set up monitoring
-
-#### 6. Auto Scaling and Monitoring
-- **Scaling patterns and strategies**
-- **CloudWatch metrics and alarms**
-- **Capacity planning**
-- **Hands-On: Implement auto scaling**
-  - Configure scaling policies
-  - Set up CloudWatch alarms
-  - Monitor application metrics
-  - Test scaling behavior
 
 ## Workshop Duration
 
@@ -122,9 +122,9 @@ Total estimated time: 4-6 hours
 - Lab 1: 45-60 minutes
 - Lab 2: 30-45 minutes
 - Lab 3: 45-60 minutes
-- Lab 4: 45-60 minutes
+- Lab 4: 30-45 minutes
 - Lab 5: 45-60 minutes
-- Lab 6: 30-45 minutes
+- Lab 6: 45-60 minutes
 
 Note: Actual duration may vary based on individual pace and prior experience.
 

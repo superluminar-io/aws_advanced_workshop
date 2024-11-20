@@ -1,85 +1,200 @@
-# Lab 6: Implementing Auto Scaling and Monitoring
+# Lab 6: Implementing Message Queuing
 
-## Prerequisites
+## Step 1: Create the infrastructure
 
-## Step 1: Configure Auto Scaling
+**1. Create SQS Queue and Lambda Function**
 
-Add to your existing `index.ts`:
+Add add the beginning of your existing `index.ts`:
 ```typescript
-// Create Auto Scaling Target
-const scalableTarget = new aws.appautoscaling.Target("workshop-scaling-target", {
-    maxCapacity: 10,
-    minCapacity: 2,
-    resourceId: pulumi.interpolateservice/${cluster.name}/${service.name},
-    scalableDimension: "ecs:service:DesiredCount",
-    serviceNamespace: "ecs",
+// Create SQS Queue
+const deadLetterQueue = new aws.sqs.Queue("workshop-dlq");
+const queue = deadLetterQueue.arn.apply(dlqArn => new aws.sqs.Queue("workshop-queue", {
+    visibilityTimeoutSeconds: 30,
+    messageRetentionSeconds: 86400,
+    redrivePolicy: JSON.stringify({
+        deadLetterTargetArn: dlqArn,
+        maxReceiveCount: 3
+    })
+}));
+// Create Lambda Role
+const lambdaRole = new aws.iam.Role("message-processor-role", {
+    assumeRolePolicy: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: [{
+            Action: "sts:AssumeRole",
+            Effect: "Allow",
+            Principal: {
+                Service: "lambda.amazonaws.com"
+            }
+        }]
+    }),
+    managedPolicyArns: [ 
+      // to allow the lambda function to send logs to CloudWatch
+        "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+    ]
 });
-// Create CPU-based Scaling Policy
-const cpuPolicy = new aws.appautoscaling.Policy("cpu-policy", {
-    policyType: "TargetTrackingScaling",
-    resourceId: scalableTarget.resourceId,
-    scalableDimension: scalableTarget.scalableDimension,
-    serviceNamespace: scalableTarget.serviceNamespace,
-    targetTrackingScalingPolicyConfiguration: {
-        predefinedMetricSpecification: {
-            predefinedMetricType: "ECSServiceAverageCPUUtilization",
+// Add SQS permissions to Lambda Role
+new aws.iam.RolePolicy("lambda-sqs-policy", {
+    role: lambdaRole.id,
+    policy: queue.arn.apply(arn => JSON.stringify({
+        Version: "2012-10-17",
+        Statement: [{
+            Effect: "Allow",
+            Action: [
+                "sqs:ReceiveMessage",
+                "sqs:DeleteMessage",
+                "sqs:GetQueueAttributes"
+            ],
+            Resource: arn
+        }]
+    }))
+});
+// Create Lambda Function
+const processor = new aws.lambda.Function("message-processor", {
+    runtime: "nodejs18.x",
+    handler: "index.handler",
+    role: lambdaRole.arn,
+    code: new pulumi.asset.AssetArchive({
+        "index.js": new pulumi.asset.StringAsset( `exports.handler = async (event) => { for (const record of event.Records) { console.log('Processing message:', record.body); } return { statusCode: 200 }; }; `)
+    })
+});
+// Add SQS trigger to Lambda
+new aws.lambda.EventSourceMapping("queue-trigger", {
+    eventSourceArn: queue.arn,
+    functionName: processor.name,
+    batchSize: 1
+});
+
+const taskRole = new aws.iam.Role("ecs-task-role", {
+    assumeRolePolicy: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: [{
+            Action: "sts:AssumeRole",
+            Effect: "Allow",
+            Principal: {
+                Service: "ecs-tasks.amazonaws.com"
+            }
+        }]
+    })
+});
+
+new aws.iam.RolePolicy("task-sqs-policy", {
+    role: taskRole.id,
+    policy: queue.arn.apply(arn => JSON.stringify({
+        Version: "2012-10-17",
+        Statement: [{
+            Effect: "Allow",
+            Action: ["sqs:SendMessage"],
+            Resource: arn
+        }]
+    }))
+});
+```
+
+**2. Update ECS Task Definition**
+
+Update your task definition to include the queue URL and permissions:
+```typescript
+// Update Task Definition with environment variables
+const taskDefinition = new aws.ecs.TaskDefinition("workshop-task", {
+    family: "workshop-app",
+    cpu: "256",
+    memory: "512",
+    networkMode: "awsvpc",
+    requiresCompatibilities: ["FARGATE"],
+    executionRoleArn: taskExecutionRole.arn,
+    taskRoleArn: taskRole.arn,
+    containerDefinitions: pulumi.all([repository.repositoryUrl, queue.url]).apply(([repoUrl, queueUrl]) => JSON.stringify([{
+        name: "workshop-app",
+        image: `${repoUrl}:latest`,
+        environment: [{
+            name: "QUEUE_URL",
+            value: queueUrl
+        }],
+        portMappings: [{
+            containerPort: 80,
+            protocol: "tcp",
+        }],
+        logConfiguration: {
+            logDriver: "awslogs",
+            options: {
+                "awslogs-group": "/ecs/workshop-app",
+                "awslogs-region": "eu-central-1",
+                "awslogs-stream-prefix": "ecs",
+            },
         },
-        targetValue: 70.0,
-        scaleInCooldown: 300,
-        scaleOutCooldown: 300,
-    },
+    }])),
 });
+```
+
+## Step 2: Modify the Typescript application to send messages
+`app.ts`. First add the `aws-sdk` package:
+```bash
+yarn add aws-sdk
+```
+
+Then add the following code to the `app.ts` file:
+```typescript
+import AWS from 'aws-sdk';
+
+const sqs = new AWS.SQS({ region: process.env.AWS_REGION });
+
+app.use(express.json())
+app.post('/message', async (req, res) => {
+    const { content } = req.body;
+    const params = {
+        QueueUrl: process.env.QUEUE_URL!,
+        MessageBody: content,
+    };
+
+    try {
+        const result = await sqs.sendMessage(params).promise();
+        res.status(200).json({ messageId: result.MessageId });
+    } catch (error) {
+        console.error('Error sending message:', error);
+        res.status(500).json({ error: 'Failed to send message to SQS' });
+    }
+});
+
 ```
 
 ## Verify the Deployment
 
-1. **Deploy the Changes**:
+Following the checkpoint style from Lab 2 (lines 276-292):
+
+1. **Build and Push the Docker Image** (make sure you exported the `PULUMI_CONFIG_PASSPHRASE` environment variable):
+
 ```bash
+cd application/ # Go to the application directory
+docker build -t workshop-app .
+docker tag workshop-app:latest $(pulumi stack output repositoryUrl):latest
+docker push $(pulumi stack output repositoryUrl):latest
+```
+
+2. **Deploy the infrastructure changes**:
+
+```bash
+cd ../ # Go back to the root of the project
 pulumi up
 ```
 
-2. **Verify in AWS Console**:
-   - Check ECS service auto scaling configuration
-   - Test scaling by generating load
+3. **Test Message Processing**:
 
-## Best Practices
+Send a test message
 
-1. **Auto Scaling**:
-   - Set appropriate scaling thresholds
-   - Configure proper cooldown periods
-   - Use target tracking for predictable workloads
-   - Implement step scaling for specific scenarios
+```bash
+curl -X POST -H "Content-Type: application/json" \
+-d '{"content":"Hello from local!"}' \
+https://$(pulumi stack output cloudfrontDomain)/message
+```
 
-2. **Monitoring**:
-   - Create comprehensive dashboards
-   - Set up meaningful alerts
-   - Monitor costs and resource utilization
-   - Implement proper log retention
+4. **Verify the message was received**:
+Check SQS > Monitoring in the AWS Console to ensure that the message was received (metrics).
+Check Lambda > Monitoring in the AWS Console to verify that the function was invoked.
+Review the Lambda logs in CloudWatch Logs to see the content of the processed message.
 
-3. **Performance**:
-   - Monitor application metrics
-   - Track scaling events
-   - Analyze resource utilization patterns
-   - Optimize container configurations
+## Summary of Steps
 
-## Troubleshooting
+With the addition of SQS and Lambda for asynchronous message processing, you've completed building a modern, distributed application architecture that incorporates containers, load balancing, content delivery, and event-driven patterns. 
 
-Common issues to check:
-
-1. **Auto Scaling Issues**:
-   - Verify scaling policy configuration
-   - Check service CPU/memory metrics
-   - Review scaling activity history
-   - Confirm target group health checks
-
-2. **CloudWatch Issues**:
-   - Verify metric dimensions
-   - Check alarm configurations
-   - Review IAM permissions
-   - Validate dashboard widgets
-
-3. **Performance Issues**:
-   - Monitor container insights
-   - Review service logs
-   - Check resource utilization
-   - Analyze scaling patterns
+This lab completes your journey through creating and managing a containerized application using Pulumi, equipping you with practical skills for building and managing distributed cloud infrastructure.

@@ -30,8 +30,8 @@ Create and prepare an application directory:
 ```bash
 mkdir application
 cd application
-npm init -y
-npm install express @types/express typescript ts-node
+yarn init -y
+yarn add express @types/express typescript ts-node
 ```
 
 Create a `tsconfig.json` file:
@@ -54,7 +54,7 @@ Create `src/app.ts`:
 import express from 'express';
 
 const app = express();
-const port = 8080;
+const port = 80;
 
 app.get('/', (req, res) => {
   res.json({ message: 'Hello from ECS!' });
@@ -69,13 +69,10 @@ Create a `Dockerfile`:
 ```dockerfile
 FROM --platform=linux/amd64 node:18-alpine
 
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm install
+WORKDIR /usr/app
 
 COPY . .
-RUN npm run build
+RUN yarn && yarn add typescript tsc ts-node && yarn build
 
 EXPOSE 80
 CMD ["node", "dist/app.js"]
@@ -102,7 +99,6 @@ aws ecr get-login-password --region eu-central-1 | docker login --username AWS -
 
 Build the image
 ```bash
-cd application/
 docker build -t workshop-app .
 ```
 
@@ -157,47 +153,4 @@ pulumi up
 ```
 
 2. **Verify the Deployment**:
-   - Navigate to ECR in AWS Console and check that the image was pushed successfully
-   - View running tasks in ECS
-   - Access the application through ALB DNS (from Lab 2)
-
-## Best Practices
-
-1. **Image Security**:
-   - Enable image scanning
-   - Use multi-stage builds
-   - Minimize image size
-   - Keep base images updated
-
-2. **ECR Management**:
-   - Implement lifecycle policies
-   - Tag images appropriately
-   - Clean up unused images
-
-3. **Application Configuration**:
-   - Use environment variables
-   - Implement health checks
-   - Follow the 12-factor app methodology
-
-## Troubleshooting
-
-Common issues and solutions:
-
-1. **Image Pull Failures**:
-   - Check ECR permissions
-   - Verify image tags
-   - Review task execution role
-
-2. **Application Errors**:
-   - Check CloudWatch logs
-   - Verify container port mappings
-   - Review environment variables
-
-3. **Performance Issues**:
-   - Monitor container metrics
-   - Review resource allocations
-   - Check application logs
-
-## Next Steps
-
-In Lab 4, we'll add CloudFront distribution to our architecture for global content delivery and enhanced security.
+Navigate to the Amazon ECR service in the AWS Console to verify that your container image was successfully pushed to your repository. Then, go to the ECS service to check your running tasks and ensure they're using the new image. Finally, access your application by opening the ALB DNS name (which you configured in Lab 2) in your web browser - you should see the "Hello from ECS!" message, confirming that your custom container is running properly.
