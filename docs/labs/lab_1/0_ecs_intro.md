@@ -22,7 +22,14 @@ EC2, on the other hand, provides more control over your infrastructure. It's sim
 
 ### Container Architecture Components
 
-The ECS architecture consists of several key components working together. **Task Definitions** serve as blueprints for your applications, specifying everything from memory allocations to environment variables. **Services** ensure your tasks maintain high availability, automatically replacing failed containers and integrating with load balancers for traffic distribution.
+The ECS architecture consists of several key components working together. 
+
+- **Task Definitions** serve as blueprints for your applications, specifying everything from memory allocations to environment variables. 
+- **Task** is the instantiation of a task definition inside a cluster. ou can run a standalone task, or you can run a task as part of a service.
+- **Services** ensure your tasks maintain high availability, automatically replacing failed containers and integrating with load balancers for traffic distribution.
+- **Cluster** is a logical grouping of tasks or services. When your tasks run on Fargate, your cluster resources are also managed by Fargate.
+- **Task execution role** grants the ECS container and Fargate agents permission to make AWS API calls on your behalf. For example, to pull a container image from an Amazon ECR private repository
+- **Task role** can be associated to an ECS task to grant permissions to use other AWS services. he task role is required when your application accesses other AWS services, such as Amazon S3.
 
 ### Container Images: Using Public ECR
 

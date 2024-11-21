@@ -8,7 +8,7 @@ Add to your existing `index.ts`:
 ```typescript
 // Create Auto Scaling Target
 const scalableTarget = new aws.appautoscaling.Target("workshop-scaling-target", {
-    maxCapacity: 10,
+    maxCapacity: 5,
     minCapacity: 2,
     resourceId: pulumi.interpolate`service/${cluster.name}/${service.name}`,
     scalableDimension: "ecs:service:DesiredCount",

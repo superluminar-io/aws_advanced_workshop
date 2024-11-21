@@ -4,7 +4,7 @@
 
 ## Introduction
 
-Welcome to the AWS Advanced Workshop! This workshop is designed for developers who want to learn about container orchestration, load balancing, and content delivery on AWS. Through hands-on labs, you'll build a production-ready containerized application infrastructure using Pulumi.
+Welcome to the AWS Advanced Workshop! This workshop is designed for developers who want to learn about container orchestration, load balancing, and content delivery on AWS. Through hands-on labs, you'll build a containerized application infrastructure using Pulumi.
 
 ## How to Use This Guide
 
@@ -19,7 +19,7 @@ Navigate through the labs in order, as each builds upon the previous one. Use th
 
 ## Project Overview
 
-This comprehensive guide takes you beyond the basics of AWS, focusing on building modern containerized applications with production-ready architectures. Through the hands-on labs, you'll create a sophisticated cloud infrastructure using Amazon ECS, Application Load Balancers, and CloudFront, all orchestrated with Pulumi's infrastructure as code. You'll learn how to deploy containerized applications, manage container registries, implement load balancing, and optimize content delivery. This workshop builds upon fundamental AWS knowledge, guiding you through the practical implementation of container orchestration, high availability patterns, and scalable architectures. By the end of this workshop, you'll have hands-on experience building and deploying production-grade containerized applications on AWS, preparing you for real-world cloud architecture challenges.
+This guide takes you beyond the basics of AWS, focusing on building modern containerized applications. Through the hands-on labs, you'll create a sophisticated cloud infrastructure using Amazon ECS, Application Load Balancers, and CloudFront, all orchestrated with Pulumi's infrastructure as code. You'll learn how to deploy containerized applications, manage container registries, implement load balancing, and optimize content delivery. This workshop builds upon fundamental AWS knowledge, guiding you through the practical implementation of container orchestration, high availability patterns, and scalable architectures. By the end of this workshop, you'll have hands-on experience building and deploying containerized applications on AWS, preparing you for real-world cloud architecture challenges.
 
 ## Prerequisites
 

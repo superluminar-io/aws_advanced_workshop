@@ -33,6 +33,14 @@ const distribution = new aws.cloudfront.Distribution("workshop-cdn", {
         defaultTtl: 3600,
         maxTtl: 86400,
     },
+    restrictions: {
+        geoRestriction: {
+            restrictionType: "none",
+        },
+    },
+    viewerCertificate: {
+        cloudfrontDefaultCertificate: true,
+    },
     origins: [{
         domainName: alb.dnsName,
         originId: "ALB",
@@ -43,14 +51,6 @@ const distribution = new aws.cloudfront.Distribution("workshop-cdn", {
             originSslProtocols: ["TLSv1.2"],
         },
     }],
-    restrictions: {
-        geoRestriction: {
-            restrictionType: "none",
-        },
-    },
-    viewerCertificate: {
-        cloudfrontDefaultCertificate: true,
-    },
 });
     // Export CloudFront domain
 export const cloudfrontDomain = distribution.domainName;
@@ -190,3 +190,14 @@ new aws.s3.BucketPolicy("error-pages-policy", {
 ```
 
 According to the best practices, the error page should be served via cloudfront and not directly from the S3 bucket. The bucket itself is private and only accessible via the CloudFront distribution.
+
+
+## Verify the Deployment
+
+1. **Deploy the Changes**:
+```bash
+pulumi up
+```
+
+2. **Verify Error Pages**:
+   - Test the error pages by adding a random path to the CloudFront URL
