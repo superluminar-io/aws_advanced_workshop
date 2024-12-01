@@ -178,8 +178,16 @@ const service = new aws.ecs.Service("workshop-service", {
         securityGroups: [taskSg.id],
         assignPublicIp: false,
     },
+    waitForSteadyState: true,
+    deploymentCircuitBreaker: {
+      enable: true,  
+      rollback: false
+    }
 });
 ```
+- **waitForSteadyState**: makes Pulumi wait until your ECS service deployment is fully complete before moving on. This ensures that your infrastructure deployment only succeeds when all tasks are actually running and healthy.
+- **Deployment Circuit Breaker**: determines whether a service deployment will fail if the service can't reach a steady state. If it is turned on, a service deployment will transition to a failed state and stop launching new tasks.
+  - [Learn more](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/deployment-circuit-breaker.html)
 
 ## Verify the Deployment
 

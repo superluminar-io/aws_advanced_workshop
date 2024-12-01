@@ -2,7 +2,6 @@
 - Labs
   - Lab 0
     - [Pulumi Setup](/labs/lab_0/0_setup)
-    - [Resources](/labs/lab_0/1_resources)
   - Lab 1
     - [Intro to ECS](/labs/lab_1/0_ecs_intro)
     - [Hands On](/labs/lab_1/1_hands_on)
