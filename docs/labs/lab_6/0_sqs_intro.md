@@ -38,4 +38,4 @@ We'll extend our Lab 5 architecture by adding:
 3. Update the ECS application to publish messages to the SQS queue
 4. Updated ECS task role for message publishing
 
-![Lab 6 Architecture](/images/lab_6_architecture.png)
+![Lab 6 Architecture](../../media/lab_6_arch.drawio.svg)
