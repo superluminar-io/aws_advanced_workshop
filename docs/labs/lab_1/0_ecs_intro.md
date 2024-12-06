@@ -12,17 +12,24 @@ Containers represent a fundamental shift in how we package and deploy applicatio
 
 ### Container Orchestration with Amazon ECS
 
-Amazon Elastic Container Service (ECS) is AWS's fully managed container orchestration service. It handles the complex tasks of placing containers across a cluster of virtual machines, monitoring their health, and maintaining the desired number of containers to support your application's demands. Think of ECS as a conductor coordinating an orchestra – ensuring each container (musician) plays its part at the right time and in harmony with others.
+Amazon Elastic Container Service (ECS) is AWS's fully managed container orchestration service. It handles the complex tasks of placing containers across a cluster of virtual machines, monitoring their health, and maintaining the desired number of containers to support your application's demands. Think of ECS as a conductor coordinating an orchestra – ensuring that each container (musician) plays its part at the right time and in harmony with the others.
 
 ### Launch Types: Fargate vs EC2
 
-AWS offers two primary ways to run your containers: Fargate and EC2. Fargate represents a serverless approach where you don't need to think about the underlying infrastructure. It's like having a managed hosting service that takes care of all the infrastructure details for you. You simply specify your container's requirements, and AWS handles everything else.
+AWS offers two primary ways to run your containers: Fargate and EC2. Fargate is a serverless approach where you don't have to worry about the underlying infrastructure. It's like having a managed hosting service that takes care of all the infrastructure details for you. You simply specify the needs of your container and AWS takes care of everything else.
 
-EC2, on the other hand, provides more control over your infrastructure. It's similar to having your own dedicated servers but with the flexibility of the cloud. This approach is particularly valuable when you need specific instance types or have custom requirements for the hosts running your containers.
+EC2, on the other hand, provides more control over your infrastructure. It's similar to having your own dedicated servers but with the flexibility of the cloud. This approach is especially valuable if you need specific instance types or have unique requirements for the hosts running your containers.
 
 ### Container Architecture Components
 
-The ECS architecture consists of several key components working together. **Task Definitions** serve as blueprints for your applications, specifying everything from memory allocations to environment variables. **Services** ensure your tasks maintain high availability, automatically replacing failed containers and integrating with load balancers for traffic distribution.
+The ECS architecture consists of several key components that work together. 
+
+- **Task Definitions** serve as blueprints for your applications, specifying everything from memory allocations to environment variables. 
+- **Task** is the instantiation of a task definition inside a cluster. You can run a standalone task, or you can run a task as part of a service.
+- **Services** ensure your tasks maintain high availability, automatically replacing failed containers and integrating with load balancers for traffic distribution.
+- **Cluster** is a logical grouping of tasks or services. When your tasks run on Fargate, your cluster resources are also managed by Fargate.
+- **Task execution role** grants the ECS container and Fargate agents permission to make AWS API calls on your behalf. For example, to pull a container image from an Amazon ECR private repository
+- **Task role** can be associated to an ECS task to grant permissions to use other AWS services. he task role is required when your application accesses other AWS services, such as Amazon S3.
 
 ### Container Images: Using Public ECR
 

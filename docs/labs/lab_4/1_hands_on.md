@@ -7,27 +7,30 @@
 Add to your existing `index.ts`:
 ```typescript
 // Create Auto Scaling Target
-const scalableTarget = new aws.appautoscaling.Target("workshop-scaling-target", {
-    maxCapacity: 10,
+const scalableTarget = new aws.appautoscaling.Target(
+  "workshop-scaling-target",
+  {
+    maxCapacity: 5,
     minCapacity: 2,
     resourceId: pulumi.interpolate`service/${cluster.name}/${service.name}`,
     scalableDimension: "ecs:service:DesiredCount",
     serviceNamespace: "ecs",
-});
+  }
+);
 // Create CPU-based Scaling Policy
 const cpuPolicy = new aws.appautoscaling.Policy("cpu-policy", {
-    policyType: "TargetTrackingScaling",
-    resourceId: scalableTarget.resourceId,
-    scalableDimension: scalableTarget.scalableDimension,
-    serviceNamespace: scalableTarget.serviceNamespace,
-    targetTrackingScalingPolicyConfiguration: {
-        predefinedMetricSpecification: {
-            predefinedMetricType: "ECSServiceAverageCPUUtilization",
-        },
-        targetValue: 20.0,
-        scaleInCooldown: 60, // 1 minute
-        scaleOutCooldown: 60, // 1 minute
+  policyType: "TargetTrackingScaling",
+  resourceId: scalableTarget.resourceId,
+  scalableDimension: scalableTarget.scalableDimension,
+  serviceNamespace: scalableTarget.serviceNamespace,
+  targetTrackingScalingPolicyConfiguration: {
+    predefinedMetricSpecification: {
+      predefinedMetricType: "ECSServiceAverageCPUUtilization",
     },
+    targetValue: 20.0,
+    scaleInCooldown: 60, // 1 minute
+    scaleOutCooldown: 60, // 1 minute
+  },
 });
 ```
 
