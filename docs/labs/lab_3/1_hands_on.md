@@ -118,29 +118,32 @@ Update your task definition in `index.ts` to use the custom image:
 ```typescript
 // Update Task Definition with custom image
 const taskDefinition = new aws.ecs.TaskDefinition("workshop-task", {
-    family: "workshop-app",
-    cpu: "256",
-    memory: "512",
-    networkMode: "awsvpc",
-    requiresCompatibilities: ["FARGATE"],
-    executionRoleArn: taskExecutionRole.arn,
-    containerDefinitions: pulumi.all([repository.repositoryUrl])
-    .apply(([repoUrl]) => JSON.stringify([{
-        name: containerName,
-        image: `${repoUrl}:latest`,
-        portMappings: [{
-            containerPort: 80,
-            protocol: "tcp",
-        }],
-        logConfiguration: {
-            logDriver: "awslogs",
-            options: {
-                "awslogs-group": "/ecs/workshop-app",
-                "awslogs-region": "eu-central-1",
-                "awslogs-stream-prefix": "ecs",
-            },
+  family: "workshop-app",
+  cpu: "256",
+  memory: "512",
+  networkMode: "awsvpc",
+  requiresCompatibilities: ["FARGATE"],
+  executionRoleArn: taskExecutionRole.arn,
+  containerDefinitions: pulumi.jsonStringify([
+    {
+      name: containerName,
+      image: pulumi.interpolate`${repository.repositoryUrl}:latest`,
+      portMappings: [
+        {
+          containerPort: 80,
+          protocol: "tcp",
         },
-    }])),
+      ],
+      logConfiguration: {
+        logDriver: "awslogs",
+        options: {
+          "awslogs-group": logGroup.name,
+          "awslogs-region": "eu-central-1",
+          "awslogs-stream-prefix": "ecs",
+        },
+      },
+    },
+  ]),
 });
 ```
 

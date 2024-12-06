@@ -8,86 +8,101 @@ Add add the beginning of your existing `index.ts`:
 ```typescript
 // Create SQS Queue
 const deadLetterQueue = new aws.sqs.Queue("workshop-dlq");
-const queue = deadLetterQueue.arn.apply(dlqArn => new aws.sqs.Queue("workshop-queue", {
-    visibilityTimeoutSeconds: 30,
-    messageRetentionSeconds: 86400,
-    redrivePolicy: JSON.stringify({
+const queue = deadLetterQueue.arn.apply(
+  (dlqArn) =>
+    new aws.sqs.Queue("workshop-queue", {
+      visibilityTimeoutSeconds: 30,
+      messageRetentionSeconds: 86400,
+      redrivePolicy: JSON.stringify({
         deadLetterTargetArn: dlqArn,
-        maxReceiveCount: 3
+        maxReceiveCount: 3,
+      }),
     })
-}));
+);
 // Create Lambda Role
 const lambdaRole = new aws.iam.Role("message-processor-role", {
-    assumeRolePolicy: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: [{
-            Action: "sts:AssumeRole",
-            Effect: "Allow",
-            Principal: {
-                Service: "lambda.amazonaws.com"
-            }
-        }]
-    }),
-    managedPolicyArns: [ 
-      // to allow the lambda function to send logs to CloudWatch
-        "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-    ]
+  assumeRolePolicy: JSON.stringify({
+    Version: "2012-10-17",
+    Statement: [
+      {
+        Action: "sts:AssumeRole",
+        Effect: "Allow",
+        Principal: {
+          Service: "lambda.amazonaws.com",
+        },
+      },
+    ],
+  }),
+  managedPolicyArns: [
+    // to allow the lambda function to send logs to CloudWatch
+    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+  ],
 });
 // Add SQS permissions to Lambda Role
 new aws.iam.RolePolicy("lambda-sqs-policy", {
-    role: lambdaRole.id,
-    policy: queue.arn.apply(arn => JSON.stringify({
-        Version: "2012-10-17",
-        Statement: [{
-            Effect: "Allow",
-            Action: [
-                "sqs:ReceiveMessage",
-                "sqs:DeleteMessage",
-                "sqs:GetQueueAttributes"
-            ],
-            Resource: arn
-        }]
-    }))
+  role: lambdaRole.id,
+  policy: queue.arn.apply((arn) =>
+    JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Action: [
+            "sqs:ReceiveMessage",
+            "sqs:DeleteMessage",
+            "sqs:GetQueueAttributes",
+          ],
+          Resource: arn,
+        },
+      ],
+    })
+  ),
 });
 // Create Lambda Function
 const processor = new aws.lambda.Function("message-processor", {
-    runtime: "nodejs18.x",
-    handler: "index.handler",
-    role: lambdaRole.arn,
-    code: new pulumi.asset.AssetArchive({
-        "index.js": new pulumi.asset.StringAsset( `exports.handler = async (event) => { for (const record of event.Records) { console.log('Processing message:', record.body); } return { statusCode: 200 }; }; `)
-    })
+  runtime: "nodejs18.x",
+  handler: "index.handler",
+  role: lambdaRole.arn,
+  code: new pulumi.asset.AssetArchive({
+    "index.js": new pulumi.asset.StringAsset(
+      `exports.handler = async (event) => { console.log(JSON.stringify(event, 2, null)); return { statusCode: 200 }; }; `
+    ),
+  }),
 });
 // Add SQS trigger to Lambda
 new aws.lambda.EventSourceMapping("queue-trigger", {
-    eventSourceArn: queue.arn,
-    functionName: processor.name,
-    batchSize: 1
+  eventSourceArn: queue.arn,
+  functionName: processor.name,
+  batchSize: 1,
 });
 
 const taskRole = new aws.iam.Role("ecs-task-role", {
-    assumeRolePolicy: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: [{
-            Action: "sts:AssumeRole",
-            Effect: "Allow",
-            Principal: {
-                Service: "ecs-tasks.amazonaws.com"
-            }
-        }]
-    })
+  assumeRolePolicy: JSON.stringify({
+    Version: "2012-10-17",
+    Statement: [
+      {
+        Action: "sts:AssumeRole",
+        Effect: "Allow",
+        Principal: {
+          Service: "ecs-tasks.amazonaws.com",
+        },
+      },
+    ],
+  }),
 });
 
 new aws.iam.RolePolicy("task-sqs-policy", {
-    role: taskRole.id,
-    policy: queue.arn.apply(arn => JSON.stringify({
-        Version: "2012-10-17",
-        Statement: [{
-            Effect: "Allow",
-            Action: ["sqs:SendMessage"],
-            Resource: arn
-        }]
-    }))
+  role: taskRole.id,
+  policy: pulumi.jsonStringify({
+    Version: "2012-10-17",
+    Statement: [
+      {
+        Effect: "Allow",
+        Action: ["sqs:SendMessage"],
+        Resource: queue.arn,
+      },
+    ],
+  }),
 });
 ```
 
@@ -97,65 +112,52 @@ Update your task definition to include the queue URL and permissions:
 ```typescript
 // Update Task Definition with environment variables
 const taskDefinition = new aws.ecs.TaskDefinition("workshop-task", {
-    family: "workshop-app",
-    cpu: "256",
-    memory: "512",
-    networkMode: "awsvpc",
-    requiresCompatibilities: ["FARGATE"],
-    executionRoleArn: taskExecutionRole.arn,
-    taskRoleArn: taskRole.arn,
-    containerDefinitions: pulumi.all([repository.repositoryUrl, queue.url]).apply(([repoUrl, queueUrl]) => JSON.stringify([{
-        name: "workshop-app",
-        image: `${repoUrl}:latest`,
-        environment: [{
-            name: "QUEUE_URL",
-            value: queueUrl
-        }],
-        portMappings: [{
-            containerPort: 80,
-            protocol: "tcp",
-        }],
-        logConfiguration: {
-            logDriver: "awslogs",
-            options: {
-                "awslogs-group": "/ecs/workshop-app",
-                "awslogs-region": "eu-central-1",
-                "awslogs-stream-prefix": "ecs",
-            },
+  ...
+  containerDefinitions: pulumi.jsonStringify([
+    {
+      ...
+      environment: [
+        {
+          name: "QUEUE_URL",
+          value: queue.url,
         },
-    }])),
+      ],
+    },
+  ]),
+  taskRoleArn: taskRole.arn,
 });
 ```
 
 ## Step 2: Modify the Typescript application to send messages
-`app.ts`. First add the `aws-sdk` package:
+Add the `AWS SDK` package for the SQS client:
 ```bash
-yarn add aws-sdk
+cd application
+yarn add @aws-sdk/client-sqs
 ```
 
 Then add the following code to the `app.ts` file:
 ```typescript
-import AWS from 'aws-sdk';
+import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 
-const sqs = new AWS.SQS({ region: process.env.AWS_REGION });
+const sqsClient = new SQSClient({ region: process.env.AWS_REGION });
 
-app.use(express.json())
-app.post('/message', async (req, res) => {
-    const { content } = req.body;
-    const params = {
-        QueueUrl: process.env.QUEUE_URL!,
-        MessageBody: content,
-    };
+app.use(express.json());
+app.post("/message", async (req, res) => {
+  const { content } = req.body;
+  const params = {
+    QueueUrl: process.env.QUEUE_URL,
+    MessageBody: content,
+  };
 
-    try {
-        const result = await sqs.sendMessage(params).promise();
-        res.status(200).json({ messageId: result.MessageId });
-    } catch (error) {
-        console.error('Error sending message:', error);
-        res.status(500).json({ error: 'Failed to send message to SQS' });
-    }
+  try {
+    const command = new SendMessageCommand(params);
+    const result = await sqsClient.send(command);
+    res.status(200).json({ messageId: result.MessageId });
+  } catch (error) {
+    console.error("Error sending message:", error);
+    res.status(500).json({ error: "Failed to send message to SQS" });
+  }
 });
-
 ```
 
 ## Verify the Deployment
@@ -165,7 +167,6 @@ Following the checkpoint style from Lab 2 (lines 276-292):
 1. **Build and Push the Docker Image** (make sure you exported the `PULUMI_CONFIG_PASSPHRASE` environment variable):
 
 ```bash
-cd application/ # Go to the application directory
 docker build -t workshop-app .
 docker tag workshop-app:latest $(pulumi stack output repositoryUrl):latest
 docker push $(pulumi stack output repositoryUrl):latest
